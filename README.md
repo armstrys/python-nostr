@@ -1,3 +1,21 @@
+
+# Introduction to python-nostr
+This repo is a fork of Jeff Thibaults wonderful [python-nostr repository](https://github.com/jeffthibault/python-nostr) I have made some small modifications to the python-nostr package, but the primary goal of this reposity is to provide a set of approachable example code for a python user who is trying to better understand the [Nostr](https://github.com/nostr-protocol/nostr) protocol.
+
+In the `notebooks` folder you will find a set of files that will help get started with nostr in an interactive [jupyter notebooks](https://jupyter.org/) environment. These include:
+ - a `.yml` file that can be used to install a nostr environment using [conda](https://docs.conda.io/en/latest/) or [mamba](https://mamba.readthedocs.io/en/latest/) package managers
+ - a `nostr.ipynb` interactive notebook with tests and examples of code usage
+
+ The `python-nostr` code in this repo is also slightly different than the original repository. I've outlined the differences below so you can be aware of how you might need to tweak your code if you use the original repository.
+  - A generic `Key` class is implemented here that does a few things
+    - allows some of the generic key methods repeated between `PublicKey` and `PrivateKey` to only be implemented once
+      - note that this change required the `PrivateKey.raw_secret` attribute to be renamed `raw_bytes`, to match the `PublicKey` class. I think this change is positive in terms of code simplicity, but may be a negative change in terms of explictly labeling the raw secret key of the private key with the word secret
+    - Implements a `Key.from_hex()` to load a private or public key from a hex string instead of bytes
+  - Adding a `RelayManager.connection`, a context manager to open and automatically close connections using the Python `with` syntax
+  - Adding an `__iter__` method to the `RelayManager` class that returns each `Relay` object
+  - A JSON `__repr__` for `Relays`
+
+
 # python-nostr
 A Python library for making [Nostr](https://github.com/nostr-protocol/nostr) clients
 
