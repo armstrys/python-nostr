@@ -22,7 +22,7 @@ class Key:
         return bech32.bech32_encode(self.bech32_prefix, converted_bits, bech32.Encoding.BECH32)
     
     @classmethod
-    def raw_bytes_from_hex(cls, hex: str) -> 'Key':
+    def from_hex(cls, hex: str) -> 'Key':
         # TODO: figure out how to properly type hint the return?
         #       as of now it wont inherit correct typing?
         return cls(bytes.fromhex(hex))
