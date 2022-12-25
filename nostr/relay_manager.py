@@ -31,12 +31,10 @@ class RelayManager:
                 args=(ssl_options,),
                 name=f"{relay.url}-thread"
             ).start()
-            print(f'connection open to {relay.url}')
 
     def close_connections(self):
         for relay in self.relays.values():
             relay.close()
-            print(f'connection to {relay.url} closed')
     
     def connection(self, *args, **kwargs):
         return Connection(self, *args, **kwargs)
