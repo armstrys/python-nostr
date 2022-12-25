@@ -8,6 +8,9 @@ class RelayManager:
         self.relays: dict[str, Relay] = {}
         self.message_pool = MessagePool()
 
+    def __iter__(self):
+        return iter(self.relays.values())
+
     def add_relay(self, url: str, read: bool=True, write: bool=True, subscriptions={}):
         policy = RelayPolicy(read, write)
         relay = Relay(url, policy, self.message_pool, subscriptions)
