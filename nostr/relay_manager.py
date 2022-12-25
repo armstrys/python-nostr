@@ -31,13 +31,26 @@ class RelayManager:
                 args=(ssl_options,),
                 name=f"{relay.url}-thread"
             ).start()
+            print(f'connection open to {relay.url}')
 
     def close_connections(self):
         for relay in self.relays.values():
             relay.close()
+            print(f'connection to {relay.url} closed')
+    
+    def connection(self, *args, **kwargs):
+        return Connection(self, *args, **kwargs)
 
     def publish_message(self, message: str):
         for relay in self.relays.values():
             if relay.policy.should_write:
                 relay.publish(message)
-            
+
+class Connection:
+    def __init__(self, relay_manager: RelayManager, *args, **kwargs):
+        self.relay_manager = relay_manager
+        self.conn = self.relay_manager.open_connections(*args, **kwargs)
+    def __enter__(self):
+        return self.conn
+    def __exit__(self, type, value, traceback):
+        self.relay_manager.close_connections()
