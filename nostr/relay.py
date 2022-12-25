@@ -18,6 +18,7 @@ class RelayPolicy:
             "write": self.should_write
         }
 
+
 class Relay:
     def __init__(
             self, 
@@ -36,6 +37,9 @@ class Relay:
             on_message=self._on_message,
             on_error=self._on_error,
             on_close=self._on_close)
+
+    def __repr__(self):
+        return json.dumps(self.to_json_object(), indent=2)
 
     def connect(self, ssl_options: dict=None):
         self.ws.run_forever(sslopt=ssl_options)
