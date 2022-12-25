@@ -6,45 +6,62 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
 from . import bech32
 
-class PublicKey:
+
+class Key:
+
     def __init__(self, raw_bytes: bytes) -> None:
         self.raw_bytes = raw_bytes
 
-    def bech32(self) -> str:
-        converted_bits = bech32.convertbits(self.raw_bytes, 8, 5)
-        return bech32.bech32_encode("npub", converted_bits, bech32.Encoding.BECH32)
-
     def hex(self) -> str:
         return self.raw_bytes.hex()
+
+    def bech32(self) -> str:
+        if not hasattr(self, 'bech32_prefix'):
+            raise ValueError(f'bech32 prefix not defined for type {type(self)}')
+        converted_bits = bech32.convertbits(self.raw_bytes, 8, 5)
+        return bech32.bech32_encode(self.bech32_prefix, converted_bits, bech32.Encoding.BECH32)
+    
+    @classmethod
+    def raw_bytes_from_hex(cls, hex: str) -> 'Key':
+        # TODO: figure out how to properly type hint the return?
+        #       as of now it wont inherit correct typing?
+        return cls(bytes.fromhex(hex))
+
+
+class PublicKey(Key):
+
+    @property
+    def bech32_prefix(self):
+        return 'npub'
 
     def verify_signed_message_hash(self, hash: str, sig: str) -> bool:
         pk = secp256k1.PublicKey(b"\x02" + self.raw_bytes, True)
         return pk.schnorr_verify(bytes.fromhex(hash), bytes.fromhex(sig), None, True)
 
-class PrivateKey:
-    def __init__(self, raw_secret: bytes=None) -> None:
-        if not raw_secret is None:
-            self.raw_secret = raw_secret
+class PrivateKey(Key):
+
+    def __init__(self, raw_bytes: bytes=None) -> None:
+        if not raw_bytes is None:
+            self.raw_bytes = raw_bytes
         else:
-            self.raw_secret = secrets.token_bytes(32)
+            self.raw_bytes = secrets.token_bytes(32)
 
-        sk = secp256k1.PrivateKey(self.raw_secret)
-        self.public_key = PublicKey(sk.pubkey.serialize()[1:])
+    @property
+    def bech32_prefix(self):
+        return 'nsec'
 
-    def bech32(self) -> str:
-        converted_bits = bech32.convertbits(self.raw_secret, 8, 5)
-        return bech32.bech32_encode("nsec", converted_bits, bech32.Encoding.BECH32)
-
-    def hex(self) -> str:
-        return self.raw_secret.hex()
+    @property
+    def public_key(self) -> PublicKey:
+        sk = secp256k1.PrivateKey(self.raw_bytes)
+        return PublicKey(sk.pubkey.serialize()[1:])
 
     def tweak_add(self, scalar: bytes) -> bytes:
-        sk = secp256k1.PrivateKey(self.raw_secret)
+        sk = secp256k1.PrivateKey(self.raw_bytes)
         return sk.tweak_add(scalar)
 
     def compute_shared_secret(self, public_key_hex: str) -> bytes:
         pk = secp256k1.PublicKey(bytes.fromhex("02" + public_key_hex), True)
-        return pk.ecdh(self.raw_secret, hashfn=copy_x)
+        return pk.ecdh(self.raw_bytes, hashfn=copy_x)
 
     def encrypt_message(self, message: str, public_key_hex: str) -> str:
         padder = padding.PKCS7(128).padder()
@@ -75,7 +92,7 @@ class PrivateKey:
         return unpadded_data.decode()
 
     def sign_message_hash(self, hash: bytes) -> str:
-        sk = secp256k1.PrivateKey(self.raw_secret)
+        sk = secp256k1.PrivateKey(self.raw_bytes)
         sig = sk.schnorr_sign(hash, None, raw=True)
         return sig.hex()
 
