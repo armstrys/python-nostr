@@ -335,6 +335,15 @@ class Client:
         raise NotImplementedError()
 
 
+################### filter building methods #####################
+#  this section is reserved for methods used to build filters   #
+#  that can be used in requests to relays. things like get      #
+#  all posts from a list of user ids with a limit of x.         #
+#                                                               #
+#################################################################
+# TODO: BUILD methods and a static filter dict
+
+
 class TextInputClient(Client):
     '''
     a simple client that can be run as
@@ -342,18 +351,25 @@ class TextInputClient(Client):
     with TextInputClient():
         pass
     '''
+    ## changing a few key methods that are used in the base class ##
+
+    def __init__(self, *args, **kwargs):
+        """adding a message store where we
+        can store messages using the _event_handler method
+        """
+        super().__init__(*args, **kwargs)
+        self.message_store = {}
 
     def __enter__(self):
-        '''
-        using this object in a with statement
-        will open connections and run
-        '''
         super().__enter__()
-        self.message_store = {}
         self.run()
         return self
     
     def _request_private_key_hex(self) -> PrivateKey:
+        """the only requirement of this method is that it
+        needs to in some way set the self.private_key
+        attribute to an instance of PrivateKey
+        """
         user_hex = input('please enter a private key hex')
         if user_hex is None:
             user_hex = ''
@@ -367,7 +383,7 @@ class TextInputClient(Client):
             print(f'generated new private key: {self.private_key.hex()}')
         return self.private_key
 
-    def _event_handler(self, event_msg):
+    def _event_handler(self, event_msg) -> None:
         event = event_msg.event
         print(f'author: {event.public_key}\n'
               f'event id: {event.id}\n'
@@ -375,7 +391,10 @@ class TextInputClient(Client):
               f'\t{event.content}')
         self.message_store.update({f'{event_msg.url}:{event.id}': event_msg})
 
-    def run(self):
+    ########## adding a couple methods used to run the app! ###########
+    ## these could be replaced by a more complex interface in theory ##
+
+    def run(self) -> None:
         cmd = 'start'
         while cmd not in ['exit', 'x', '0']:
             if cmd != 'start':
@@ -398,7 +417,7 @@ class TextInputClient(Client):
             cmd = input('see output for choices').lower()
         print('exiting')
     
-    def execute(self, cmd):
+    def execute(self, cmd) -> None:
         if cmd == '1':
             text_note = input(f'Enter a text note:\n')
             print(f'note:\n\n{text_note}')
