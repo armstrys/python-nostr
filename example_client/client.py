@@ -96,6 +96,13 @@ class Client:
     def connect(self) -> None:
         self.relay_manager.open_connections(self.ssl_options)
         time.sleep(2)
+        for url, connected in self.relay_manager.connection_statuses.items():
+            if not connected:
+                warnings.warn(
+                    f'could not connect to {url}... removing relay.'
+                )
+                self.relay_manager.remove_relay(url=url)
+        assert all(self.relay_manager.connection_statuses.values())
         self._is_connected = True
     
     def disconnect(self) -> None:
