@@ -1,5 +1,12 @@
 """
 a barebones client implementation based on python-nostr
+
+TODO: add new features
+ - websocket connection test: `_is_connected`
+ - switch accounts
+ - change relays with Client.connect and disconnect methods
+ - figure out how to reset message pool or better deal with old requests?
+ - continue filling out remaining core methods
 """
 
 ####### make sure python-nostr is accessible ###################
@@ -19,7 +26,8 @@ import pprint
 from nostr.key import PrivateKey, PublicKey
 from nostr.relay_manager import RelayManager
 from nostr.message_type import ClientMessageType
-from nostr.message_pool import MessagePool
+from nostr.message_pool import MessagePool, EventMessage,\
+    NoticeMessage, EndOfStoredEventsMessage
 from nostr.filter import Filter, Filters
 from nostr.event import Event, EventKind
 
@@ -27,7 +35,8 @@ from nostr.event import Event, EventKind
 class Client:
 
     def __init__(self, public_key_hex: str = None, private_key_hex: str = None,
-                 relay_urls: list = None, allow_duplicates: bool = False):
+                 relay_urls: list = None, ssl_options: dict = {},
+                 allow_duplicates: bool = False):
         """A basic framework for common operations that a nostr client will
         need to execute.
 
@@ -37,7 +46,13 @@ class Client:
                 Defaults to None, in which case client is effectively read only
             relay_urls (list, optional): provide a list of relay urls.
                 Defaults to None, in which case a default list will be used.
+            ssl_options (dict, optional): ssl options for websocket connection
+                Defaults to empty dict
+            allow_duplicates (bool, optional): whether or not to allow duplicate
+                event ids into the queue from multiple relays. This isn't fully
+                working yet. Defaults to False.
         """
+        self.ssl_options = ssl_options
         self.allow_duplicates = allow_duplicates
         if public_key_hex is not None and private_key_hex is not None:
             self.private_key = PrivateKey.from_hex(private_key_hex)
@@ -58,9 +73,9 @@ class Client:
         
         if relay_urls is None:
             relay_urls = [
-                # 'wss://nostr-2.zebedee.cloud',
+                'wss://nostr-2.zebedee.cloud',
                 # 'wss://nostr.zebedee.cloud',
-                'wss://relay.damus.io',
+                # 'wss://relay.damus.io',
             ]
         else:
             pass
@@ -68,35 +83,106 @@ class Client:
         self.relay_manager = RelayManager(allow_duplicates=self.allow_duplicates)
         for url in relay_urls:
             self.relay_manager.add_relay(url=url)
+    
+    def __enter__(self):
+        """context manager to allow processing a connected client
+        within a `with` statement
+
+        Returns:
+            self: a `with` statement returns this object as it's assignment
+            so that the client can be instantiated and used within
+            the `with` statement.
+        """
+        self.connect()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        """closes the connections when exiting the `with` context
+
+        arguments are currently unused, but could be use to control
+        client behavior on error.
+
+        Args:
+            type (_type_): _description_
+            value (_type_): _description_
+            traceback (_type_): _description_
+        """
+        self.disconnect()
+        return traceback
+
+    def connect(self) -> None:
+        self.relay_manager.open_connections(self.ssl_options)
+        time.sleep(2)
+    
+    def disconnect(self) -> None:
+        time.sleep(2)
+        self.relay_manager.close_connections()
 
     @staticmethod
-    def _event_handler(event_msg):
+    def _event_handler(event_msg: EventMessage):
+        """a hidden method used to handle event outputs
+        from a relay. This can be overwritten to store events
+        to a db for example.
+
+        Args:
+            event_msg (EventMessage): Event message returned from relay
+        """
         pprint.pprint(event_msg.event.to_json_object(), indent=2)
 
     @staticmethod
-    def _notice_handler(notice_msg):
-        pprint.pprint(notice_msg.content, indent=2)
+    def _notice_handler(notice_msg: NoticeMessage):
+        """a hidden method used to handle notice outputs
+        from a relay. This can be overwritten to display notices
+        differently - should be warnings or errors?
+
+        Args:
+            notice_msg (NoticeMessage): Notice message returned from relay
+        """
+        warnings.warn(notice_msg.content)
 
     @staticmethod
-    def _eose_handler(eose_msg):
+    def _eose_handler(eose_msg: EndOfStoredEventsMessage):
+        """a hidden method used to handle notice outputs
+        from a relay. This can be overwritten to display notices
+        differently - should be warnings or errors?
+
+        Args:
+            notice_msg (EndOfStoredEventsMessage): Message from relay
+                to signify the last event in a subscription has been
+                provided.
+        """
         print(f'end of subscription: {eose_msg.subscription_id} received.')
 
     def get_events_from_relay(self):
+        """calls the _event_handler method on all events from relays
+        """
         while self.relay_manager.message_pool.has_events():
             event_msg = self.relay_manager.message_pool.get_event()
             self._event_handler(event_msg=event_msg)
 
     def get_notices_from_relay(self):
+        """calls the _notice_handler method on all notices from relays
+        """
         while self.relay_manager.message_pool.has_notices():
             notice_msg = self.relay_manager.message_pool.get_notice()
             self._notice_handler(notice_msg=notice_msg)
 
     def get_eose_from_relay(self):
+        """calls the _eose_handler end of subsribtion events from relays
+        """
         while self.relay_manager.message_pool.has_eose_notices():
             eose_msg = self.relay_manager.message_pool.get_eose_notice()
             self._eose_handler(eose_msg=eose_msg)
 
     def publish_request(self, subscription_id: str, request_filters: Filters) -> None:
+        """publishes a request from a subscription id and a set of filters. Filters
+        can be defined using the request_by_custom_filter method or from a list of
+        preset filters (as of yet to be created):
+
+        Args:
+            subscription_id (str): subscription id to be sent to relau
+            request_filters (Filters): list of filters for a subscription
+        """
         request = [ClientMessageType.REQUEST, subscription_id]
         request.extend(request_filters.to_json_array())
         message = json.dumps(request)
@@ -110,6 +196,12 @@ class Client:
         self.get_eose_from_relay()
     
     def publish_event(self, event: Event) -> None:
+        """publish an event and immediately checks for a notice
+        from the relay in case of an invalid event
+
+        Args:
+            event (Event): _description_
+        """
         event.sign(self.private_key.hex())
         message = json.dumps([ClientMessageType.EVENT, event.to_json_object()])
         print(message)
@@ -118,6 +210,13 @@ class Client:
         self.get_notices_from_relay()
 
     def request_by_custom_filter(self, subscription_id, **filter_kwargs) -> None:
+        """make a relay request from kwargs for a single Filter object
+        as defined in python-nostr.filter.Filter
+
+        Args:
+            subscription_id (_type_): _description_
+        Kwargs to follow python-nostr.filter.Filter
+        """
         custom_request_filters = Filters([Filter(**filter_kwargs)])
         self.publish_request(
             subscription_id=subscription_id,
@@ -133,6 +232,11 @@ class Client:
         raise NotImplementedError()
     
     def publish_text_note(self, text: str) -> None:
+        """publish a text note to relays
+
+        Args:
+            text (str): text for nostr note to be published
+        """
         # TODO: need regex parsing to handle @
         event = Event(public_key=self.public_key.hex(),
                       content=text,
@@ -144,6 +248,12 @@ class Client:
         raise NotImplementedError()
 
     def publish_deletion(self, event_id: str, reason: str) -> None:
+        """delete a single event by id
+
+        Args:
+            event_id (str): event id/hash
+            reason (str): a reason for deletion provided by the user
+        """
         event = Event(public_key=self.public_key.hex(),
                       kind=EventKind.DELETE,
                       content=reason,
@@ -177,20 +287,7 @@ class Client:
         raise NotImplementedError()
 
 
-class ConnectedClient(Client):
-    def __init__(self, ssl_options, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ssl_options = ssl_options
-    def __enter__(self):
-        self.relay_manager.open_connections(self.ssl_options)
-        time.sleep(2)
-        return self
-    def __exit__(self, type, value, traceback):
-        time.sleep(2)
-        self.relay_manager.close_connections()
-
-
-class TextInputClient(ConnectedClient):
+class TextInputClient(Client):
     '''
     a simple client that can be run as
     ```
@@ -230,6 +327,7 @@ class TextInputClient(ConnectedClient):
                 \t4\tdelete an event
                 \t5\tcheck deletions
                 \t6\tget metadata by hex of user
+                \t7\tcheck event
                 '''
             print(menu)
             cmd = input('see output for choices').lower()
@@ -284,6 +382,16 @@ class TextInputClient(ConnectedClient):
                 subscription_id=f'{author}_last10metadata',
                 kinds=[EventKind.SET_METADATA],
                 authors=[author],
+                limit=10
+                )
+            print(self.message_store)
+
+        elif cmd == '7':
+            event_id = input('event id to check?')
+            self.request_by_custom_filter(
+                subscription_id=f'{event_id}_single_event',
+                kinds=[EventKind.TEXT_NOTE],
+                ids=[event_id],
                 limit=10
                 )
             print(self.message_store)
