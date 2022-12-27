@@ -381,8 +381,8 @@ class TextInputClient(Client):
         attribute to an instance of PrivateKey
         """
         user_hex = input('please enter a private key hex')
-        if user_hex is None:
-            user_hex = ''
+        if user_hex.strip() == '':
+            user_hex = 'x'
         try:
             self.private_key = PrivateKey.from_hex(user_hex)
             print('successfully loaded')
