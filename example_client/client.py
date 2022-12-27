@@ -60,7 +60,7 @@ class Client:
         if relay_urls is None:
             relay_urls = [
                 'wss://nostr-2.zebedee.cloud',
-                'wss://nostr.zebedee.cloud',
+                'wss://nostr-relay.lnmarkets.com',
                 'wss://relay.damus.io',
             ]
         else:
@@ -162,7 +162,10 @@ class Client:
             self.relay_manager.add_relay(url=url)
         if was_connected:
             self.connect()
-        
+    
+    @property
+    def relay_urls(self) -> list:
+        return [relay.url for relay in self.relay_manager]
 
     @staticmethod
     def _event_handler(event_msg: EventMessage):
@@ -386,6 +389,10 @@ class TextInputClient(Client):
                 \t5\tcheck deletions
                 \t6\tget metadata by hex of user
                 \t7\tcheck event
+                \t8\tget recommended server
+                \t9\tget contacts
+                \t10\tprint relays
+                \t11\tadd relay
                 '''
             print(menu)
             cmd = input('see output for choices').lower()
@@ -453,6 +460,31 @@ class TextInputClient(Client):
                 limit=10
                 )
             print(self.message_store)
+        elif cmd == '8':
+            author = input('user to check?')
+            self.request_by_custom_filter(
+                subscription_id=f'{author}_recommended_server',
+                kinds=[EventKind.RECOMMEND_RELAY],
+                authors=[author],
+                limit=10
+                )
+            print(self.message_store)
+        elif cmd == '9':
+            author = input('user to check?')
+            self.request_by_custom_filter(
+                subscription_id=f'{author}_contacts',
+                kinds=[EventKind.CONTACTS],
+                authors=[author],
+                limit=10
+                )
+            print(self.message_store)
+        elif cmd == '10':
+            print(self.relay_urls)
+        elif cmd == '11':
+            relay_url = input('what is the relay url')
+            self.set_relays(self.relay_urls + [relay_url])
+            print(f'connection status: {self.relay_manager.connection_statuses}')
+
         else:
             print('command not found. returning to menu')
 
