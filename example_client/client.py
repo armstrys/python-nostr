@@ -52,24 +52,11 @@ class Client:
                 event ids into the queue from multiple relays. This isn't fully
                 working yet. Defaults to False.
         """
+        self._is_connected = False
         self.ssl_options = ssl_options
         self.allow_duplicates = allow_duplicates
-        if public_key_hex is not None and private_key_hex is not None:
-            self.private_key = PrivateKey.from_hex(private_key_hex)
-            if public_key_hex != self.private_key.public_key.hex():
-                raise Exception('private key does not match public key')
-            self.public_key = self.private_key.public_key
-        elif public_key_hex is None and private_key_hex is None:
-            print('no keys provided. new account is being generated...')
-            self.private_key = PrivateKey()
-            self.public_key = self.private_key.public_key
-        elif private_key_hex is not None:
-            self.private_key = PrivateKey.from_hex(private_key_hex)
-            self.public_key = self.private_key.public_key
-        elif public_key_hex is not None:
-            print('no private key provided. client initiated in read-only mode')
-            self.public_key = PublicKey.from_hex(public_key_hex)
-            self.private_key = None
+        self. set_account(public_key_hex=public_key_hex,
+                          private_key_hex=private_key_hex)
         
         if relay_urls is None:
             relay_urls = [
@@ -79,10 +66,7 @@ class Client:
             ]
         else:
             pass
-        
-        self.relay_manager = RelayManager(allow_duplicates=self.allow_duplicates)
-        for url in relay_urls:
-            self.relay_manager.add_relay(url=url)
+        self.set_relays(relay_urls=relay_urls)
     
     def __enter__(self):
         """context manager to allow processing a connected client
@@ -113,10 +97,41 @@ class Client:
     def connect(self) -> None:
         self.relay_manager.open_connections(self.ssl_options)
         time.sleep(2)
+        self._is_connected = True
     
     def disconnect(self) -> None:
         time.sleep(2)
         self.relay_manager.close_connections()
+        self._is_connected = False
+
+    def set_account(self, public_key_hex: str = None, private_key_hex: str = None,):
+        if public_key_hex is not None and private_key_hex is not None:
+            self.private_key = PrivateKey.from_hex(private_key_hex)
+            if public_key_hex != self.private_key.public_key.hex():
+                raise Exception('private key does not match public key')
+            self.public_key = self.private_key.public_key
+        elif public_key_hex is None and private_key_hex is None:
+            print('no keys provided. new account is being generated...')
+            self.private_key = PrivateKey()
+            self.public_key = self.private_key.public_key
+        elif private_key_hex is not None:
+            self.private_key = PrivateKey.from_hex(private_key_hex)
+            self.public_key = self.private_key.public_key
+        elif public_key_hex is not None:
+            print('no private key provided. client initiated in read-only mode')
+            self.public_key = PublicKey.from_hex(public_key_hex)
+            self.private_key = None
+    
+    def set_relays(self, relay_urls: list = None):
+        was_connected = self._is_connected
+        if self._is_connected:
+            self.disconnect()
+        self.relay_manager = RelayManager(allow_duplicates=self.allow_duplicates)
+        for url in relay_urls:
+            self.relay_manager.add_relay(url=url)
+        if was_connected:
+            self.connect()
+        
 
     @staticmethod
     def _event_handler(event_msg: EventMessage):
