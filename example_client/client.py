@@ -57,12 +57,11 @@ class Client:
         self.allow_duplicates = allow_duplicates
         self. set_account(public_key_hex=public_key_hex,
                           private_key_hex=private_key_hex)
-        
         if relay_urls is None:
             relay_urls = [
                 'wss://nostr-2.zebedee.cloud',
-                # 'wss://nostr.zebedee.cloud',
-                # 'wss://relay.damus.io',
+                'wss://nostr.zebedee.cloud',
+                'wss://relay.damus.io',
             ]
         else:
             pass

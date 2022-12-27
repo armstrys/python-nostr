@@ -47,6 +47,14 @@ class Relay:
     def close(self):
         self.ws.close()
 
+    def test_connection(self) -> bool:
+        """check the socket for connection status
+
+        Returns:
+            bool: True or false of whether the connection is active
+        """
+        return False if self.ws.sock is None else self.ws.sock.connected
+
     def publish(self, message: str):
         self.ws.send(message)
 

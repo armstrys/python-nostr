@@ -39,6 +39,17 @@ class RelayManager:
         for relay in self.relays.values():
             relay.close()
     
+    @property
+    def connection_statuses(self) -> dict:
+        """gets the url and connection statuses of relays
+
+        Returns:
+            dict: bool of connection statuses
+        """
+        statuses = [relay.test_connection() for relay in self]
+        urls = [relay.url for relay in self]
+        return dict(zip(urls, statuses))
+    
     def connection(self, *args, **kwargs):
         return Connection(self, *args, **kwargs)
 
