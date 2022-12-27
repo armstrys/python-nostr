@@ -104,11 +104,22 @@ class Client:
         self.relay_manager.close_connections()
         self._is_connected = False
 
-    def set_account(self, public_key_hex: str = None, private_key_hex: str = None,):
+    def set_account(self, public_key_hex: str = None, private_key_hex: str = None) -> None:
+        """logic to set public and private keys
+
+        Args:
+            public_key_hex (str, optional): if only public key is provided, operations
+                that require a signature will fail. Defaults to None.
+            private_key_hex (str, optional): _description_. Defaults to None.
+
+        Raises:
+            ValueException: if the private key and public key are both provided but
+                don't match
+        """
         if public_key_hex is not None and private_key_hex is not None:
             self.private_key = PrivateKey.from_hex(private_key_hex)
             if public_key_hex != self.private_key.public_key.hex():
-                raise Exception('private key does not match public key')
+                raise ValueError('private key does not match public key')
             self.public_key = self.private_key.public_key
         elif public_key_hex is None and private_key_hex is None:
             print('no keys provided. new account is being generated...')
@@ -121,6 +132,22 @@ class Client:
             print('no private key provided. client initiated in read-only mode')
             self.public_key = PublicKey.from_hex(public_key_hex)
             self.private_key = None
+    
+    def _request_private_key_hex(self) -> PrivateKey:
+        """method to request private key. this method should be overwritten
+        when building out a UI
+
+        Raises:
+            NotImplementedError: until this method is rewritten when building
+                an interface
+
+        Returns:
+            PrivateKey: the new private_key object for the client. will also
+                be set in place at self.private_key
+        """
+        raise NotImplementedError()
+        self.private_key = None
+        return self.private_key
     
     def set_relays(self, relay_urls: list = None):
         was_connected = self._is_connected
