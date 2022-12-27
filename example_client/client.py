@@ -96,19 +96,33 @@ class Client:
     def connect(self) -> None:
         self.relay_manager.open_connections(self.ssl_options)
         time.sleep(2)
-        for url, connected in self.relay_manager.connection_statuses.items():
+        for url, connected in self.connection_statuses.items():
             if not connected:
                 warnings.warn(
                     f'could not connect to {url}... removing relay.'
                 )
                 self.relay_manager.remove_relay(url=url)
-        assert all(self.relay_manager.connection_statuses.values())
+        assert all(self.connection_statuses.values())
         self._is_connected = True
     
     def disconnect(self) -> None:
         time.sleep(2)
         self.relay_manager.close_connections()
         self._is_connected = False
+    
+    @property
+    def relay_urls(self) -> list:
+        return [relay.url for relay in self.relay_manager]
+    
+    @property
+    def connection_statuses(self) -> dict:
+        """gets the url and connection statuses of relays
+
+        Returns:
+            dict: bool of connection statuses
+        """
+        statuses = [relay.is_connected for relay in self.relay_manager]
+        return dict(zip(self.relay_urls, statuses))
 
     def set_account(self, public_key_hex: str = None, private_key_hex: str = None) -> None:
         """logic to set public and private keys
@@ -162,10 +176,6 @@ class Client:
             self.relay_manager.add_relay(url=url)
         if was_connected:
             self.connect()
-    
-    @property
-    def relay_urls(self) -> list:
-        return [relay.url for relay in self.relay_manager]
 
     @staticmethod
     def _event_handler(event_msg: EventMessage):
@@ -502,7 +512,7 @@ class TextInputClient(Client):
         elif cmd == '11':
             relay_url = input('what is the relay url')
             self.set_relays(self.relay_urls + [relay_url])
-            print(f'connection status: {self.relay_manager.connection_statuses}')
+            print(f'connection status: {self.connection_statuses}')
 
         else:
             print('command not found. returning to menu')
