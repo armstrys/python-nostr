@@ -19,6 +19,7 @@ import pprint
 from nostr.key import PrivateKey, PublicKey
 from nostr.relay_manager import RelayManager
 from nostr.message_type import ClientMessageType
+from nostr.message_pool import MessagePool
 from nostr.filter import Filter, Filters
 from nostr.event import Event, EventKind
 
@@ -26,7 +27,7 @@ from nostr.event import Event, EventKind
 class Client:
 
     def __init__(self, public_key_hex: str = None, private_key_hex: str = None,
-             relay_urls: list = None):
+                 relay_urls: list = None, allow_duplicates: bool = False):
         """A basic framework for common operations that a nostr client will
         need to execute.
 
@@ -37,6 +38,7 @@ class Client:
             relay_urls (list, optional): provide a list of relay urls.
                 Defaults to None, in which case a default list will be used.
         """
+        self.allow_duplicates = allow_duplicates
         if public_key_hex is not None and private_key_hex is not None:
             self.private_key = PrivateKey.from_hex(private_key_hex)
             if public_key_hex != self.private_key.public_key.hex():
@@ -56,14 +58,14 @@ class Client:
         
         if relay_urls is None:
             relay_urls = [
-                'wss://nostr-2.zebedee.cloud',
+                # 'wss://nostr-2.zebedee.cloud',
                 # 'wss://nostr.zebedee.cloud',
-                # 'wss://relay.damus.io',
+                'wss://relay.damus.io',
             ]
         else:
             pass
         
-        self.relay_manager = RelayManager()
+        self.relay_manager = RelayManager(allow_duplicates=self.allow_duplicates)
         for url in relay_urls:
             self.relay_manager.add_relay(url=url)
 
@@ -102,7 +104,7 @@ class Client:
             subscription_id, request_filters
             )
         self.relay_manager.publish_message(message)
-        time.sleep(2)
+        time.sleep(1)
         self.get_events_from_relay()
         self.get_notices_from_relay()
         self.get_eose_from_relay()
@@ -112,6 +114,8 @@ class Client:
         message = json.dumps([ClientMessageType.EVENT, event.to_json_object()])
         print(message)
         self.relay_manager.publish_message(message)
+        time.sleep(1)
+        self.get_notices_from_relay()
 
     def request_by_custom_filter(self, subscription_id, **filter_kwargs) -> None:
         custom_request_filters = Filters([Filter(**filter_kwargs)])
@@ -207,8 +211,11 @@ class TextInputClient(ConnectedClient):
     
     def _event_handler(self, event_msg):
         event = event_msg.event
-        print(f'author: {event.public_key}\nevent id: {event.id}\n\t{event.content}')
-        self.message_store.update({event.id: event})
+        print(f'author: {event.public_key}\n'
+              f'event id: {event.id}\n'
+              f'url: {event_msg.url}\n'
+              f'\t{event.content}')
+        self.message_store.update({f'{event_msg.url}:{event.id}': event_msg})
 
     def run(self):
         cmd = 'start'
@@ -222,6 +229,7 @@ class TextInputClient(ConnectedClient):
                 \t3\tget last 10 from hex of author
                 \t4\tdelete an event
                 \t5\tcheck deletions
+                \t6\tget metadata by hex of user
                 '''
             print(menu)
             cmd = input('see output for choices').lower()
@@ -265,7 +273,17 @@ class TextInputClient(ConnectedClient):
             self.request_by_custom_filter(
                 subscription_id=f'{author}_last10deletes',
                 kinds=[EventKind.DELETE],
-                authors=[self.public_key.hex()],
+                authors=[author],
+                limit=10
+                )
+            print(self.message_store)
+
+        elif cmd == '6':
+            author = input('who?')
+            self.request_by_custom_filter(
+                subscription_id=f'{author}_last10metadata',
+                kinds=[EventKind.SET_METADATA],
+                authors=[author],
                 limit=10
                 )
             print(self.message_store)

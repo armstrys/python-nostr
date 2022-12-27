@@ -21,7 +21,8 @@ class EndOfStoredEventsMessage:
         self.url = url
 
 class MessagePool:
-    def __init__(self) -> None:
+    def __init__(self, allow_duplicates: bool = False) -> None:
+        self.allow_duplicates = allow_duplicates
         self.events: Queue[EventMessage] = Queue()
         self.notices: Queue[NoticeMessage] = Queue()
         self.eose_notices: Queue[EndOfStoredEventsMessage] = Queue()
@@ -57,7 +58,7 @@ class MessagePool:
             e = message_json[2]
             event = Event(e['pubkey'], e['content'], e['created_at'], e['kind'], e['tags'], e['id'], e['sig'])
             with self.lock:
-                if not event.id in self._unique_events:
+                if self.allow_duplicates or event.id not in self._unique_events:
                     self.events.put(EventMessage(event, subscription_id, url))
                     self._unique_events.add(event.id)
         elif message_type == RelayMessageType.NOTICE:
