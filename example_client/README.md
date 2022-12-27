@@ -5,8 +5,8 @@ Started this as a fun learning exercise - I am not proficient at code developmen
  - a base `Client` class that
     - collects and simplifies many of the key features from `python-nostr`
     - allows a user to invoke a client connection and run operations within a `with` statement
- - and a `TextInputClient` class that shows an example of a super bare bones text input client which is most simply invoked by simply calling with a private key hex (pk_hex):
+ - and a `TextInputClient` class that shows an example of a super bare bones text input client which is most simply invoked by simply calling:
 ```
-with TextInputClient(private_key_hex=pk_hex) as client:
+with TextInputClient() as client:
     pass
 ```
