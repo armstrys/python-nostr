@@ -55,7 +55,7 @@ class Client:
         self._is_connected = False
         self.ssl_options = ssl_options
         self.allow_duplicates = allow_duplicates
-        self. set_account(public_key_hex=public_key_hex,
+        self.set_account(public_key_hex=public_key_hex,
                           private_key_hex=private_key_hex)
         if relay_urls is None:
             relay_urls = [
@@ -122,37 +122,35 @@ class Client:
             ValueException: if the private key and public key are both provided but
                 don't match
         """
-        if public_key_hex is not None and private_key_hex is not None:
+        self.private_key = None
+        self.public_key = None
+        if private_key_hex is None:
+            self.private_key = self._request_private_key_hex()
+        else:
             self.private_key = PrivateKey.from_hex(private_key_hex)
-            if public_key_hex != self.private_key.public_key.hex():
-                raise ValueError('private key does not match public key')
+
+        if public_key_hex is None:
             self.public_key = self.private_key.public_key
-        elif public_key_hex is None and private_key_hex is None:
-            print('no keys provided. new account is being generated...')
-            self.private_key = PrivateKey()
-            self.public_key = self.private_key.public_key
-        elif private_key_hex is not None:
-            self.private_key = PrivateKey.from_hex(private_key_hex)
-            self.public_key = self.private_key.public_key
-        elif public_key_hex is not None:
-            print('no private key provided. client initiated in read-only mode')
+        else:
+            self.public_key = PublicKey.from_hex(public_key_hex)
+        public_key_hex = self.public_key.hex()
+        
+        if public_key_hex != self.private_key.public_key.hex():
             self.public_key = PublicKey.from_hex(public_key_hex)
             self.private_key = None
+        print(f'logged in as public key\n'
+              f'\tbech32: {self.public_key.bech32()}\n'
+              f'\thex: {self.public_key.hex()}')
     
-    def _request_private_key_hex(self) -> PrivateKey:
+    def _request_private_key_hex(self) -> str:
         """method to request private key. this method should be overwritten
         when building out a UI
-
-        Raises:
-            NotImplementedError: until this method is rewritten when building
-                an interface
 
         Returns:
             PrivateKey: the new private_key object for the client. will also
                 be set in place at self.private_key
         """
-        raise NotImplementedError()
-        self.private_key = None
+        self.private_key = PrivateKey()
         return self.private_key
     
     def set_relays(self, relay_urls: list = None):
@@ -348,12 +346,25 @@ class TextInputClient(Client):
         using this object in a with statement
         will open connections and run
         '''
-        self.relay_manager.open_connections(self.ssl_options)
+        super().__enter__()
         self.message_store = {}
-        time.sleep(2)
         self.run()
         return self
     
+    def _request_private_key_hex(self) -> PrivateKey:
+        user_hex = input('please enter a private key hex')
+        if user_hex is None:
+            user_hex = ''
+        try:
+            self.private_key = PrivateKey.from_hex(user_hex)
+            print('successfully loaded')
+        except:
+            print('could not generate private key from input. '
+                  'generating a new random key')
+            self.private_key = PrivateKey()
+            print(f'generated new private key: {self.private_key.hex()}')
+        return self.private_key
+
     def _event_handler(self, event_msg):
         event = event_msg.event
         print(f'author: {event.public_key}\n'
