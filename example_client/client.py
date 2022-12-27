@@ -132,7 +132,7 @@ class Client:
     def publish_metadata(self) -> None:
         raise NotImplementedError()
     
-    def publish_text_note(self, text) -> None:
+    def publish_text_note(self, text: str) -> None:
         # TODO: need regex parsing to handle @
         event = Event(public_key=self.public_key.hex(),
                       content=text,
@@ -143,7 +143,7 @@ class Client:
         # TODO: need regex parsing to handle @
         raise NotImplementedError()
 
-    def publish_deletion(self, event_id, reason) -> None:
+    def publish_deletion(self, event_id: str, reason: str) -> None:
         event = Event(public_key=self.public_key.hex(),
                       kind=EventKind.DELETE,
                       content=reason,
