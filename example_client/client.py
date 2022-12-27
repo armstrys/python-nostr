@@ -36,7 +36,7 @@ class Client:
 
     def __init__(self, public_key_hex: str = None, private_key_hex: str = None,
                  relay_urls: list = None, ssl_options: dict = {},
-                 allow_duplicates: bool = False):
+                 first_response_only: bool = True):
         """A basic framework for common operations that a nostr client will
         need to execute.
 
@@ -54,7 +54,7 @@ class Client:
         """
         self._is_connected = False
         self.ssl_options = ssl_options
-        self.allow_duplicates = allow_duplicates
+        self.first_response_only = first_response_only
         self.set_account(public_key_hex=public_key_hex,
                           private_key_hex=private_key_hex)
         if relay_urls is None:
@@ -171,7 +171,7 @@ class Client:
         was_connected = self._is_connected
         if self._is_connected:
             self.disconnect()
-        self.relay_manager = RelayManager(allow_duplicates=self.allow_duplicates)
+        self.relay_manager = RelayManager(first_response_only=self.first_response_only)
         for url in relay_urls:
             self.relay_manager.add_relay(url=url)
         if was_connected:

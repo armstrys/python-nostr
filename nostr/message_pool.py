@@ -21,12 +21,12 @@ class EndOfStoredEventsMessage:
         self.url = url
 
 class MessagePool:
-    def __init__(self, allow_duplicates: bool = False) -> None:
-        self.allow_duplicates = allow_duplicates
+    def __init__(self, first_response_only: bool = True) -> None:
+        self.first_response_only = first_response_only
         self.events: Queue[EventMessage] = Queue()
         self.notices: Queue[NoticeMessage] = Queue()
         self.eose_notices: Queue[EndOfStoredEventsMessage] = Queue()
-        self._unique_events: set = set()
+        self._unique_objects: set = set()
         self.lock: Lock = Lock()
     
     def add_message(self, message: str, url: str):
@@ -58,9 +58,13 @@ class MessagePool:
             e = message_json[2]
             event = Event(e['pubkey'], e['content'], e['created_at'], e['kind'], e['tags'], e['id'], e['sig'])
             with self.lock:
-                if self.allow_duplicates or event.id not in self._unique_events:
+                if self.first_response_only:
+                    object_id = event.id
+                else:
+                    object_id = f'{event.id}:{url}'
+                if object_id not in self._unique_objects:
                     self.events.put(EventMessage(event, subscription_id, url))
-                    self._unique_events.add(event.id)
+                    self._unique_objects.add(event.id)
         elif message_type == RelayMessageType.NOTICE:
             self.notices.put(NoticeMessage(message_json[1], url))
         elif message_type == RelayMessageType.END_OF_STORED_EVENTS:

@@ -4,9 +4,9 @@ from .message_pool import MessagePool
 from .relay import Relay, RelayPolicy
 
 class RelayManager:
-    def __init__(self, allow_duplicates: bool = False) -> None:
+    def __init__(self, first_response_only: bool = True) -> None:
         self.relays: dict[str, Relay] = {}
-        self.message_pool = MessagePool(allow_duplicates=allow_duplicates)
+        self.message_pool = MessagePool(first_response_only=first_response_only)
 
     def __iter__(self):
         return iter(self.relays.values())
