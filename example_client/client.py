@@ -2,10 +2,10 @@
 a barebones client implementation based on python-nostr
 
 TODO: add new features
- - websocket connection test: `_is_connected`
  - switch accounts
  - change relays with Client.connect and disconnect methods
  - figure out how to reset message pool or better deal with old requests?
+ - regex handling of @ in text
  - continue filling out remaining core methods
 """
 
@@ -290,7 +290,6 @@ class Client:
         self.publish_event(event=event)
 
     def publish_recommended_relay(self) -> None:
-        # TODO: need regex parsing to handle @
         raise NotImplementedError()
 
     def publish_deletion(self, event_id: str, reason: str) -> None:
@@ -601,4 +600,3 @@ relay_list = [
     'wss://nostr.gromeul.eu',
     'wss://nostr-relay.alekberg.net',
     ]
-    
