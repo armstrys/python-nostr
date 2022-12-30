@@ -17,6 +17,10 @@ class PublicKey:
         raw_bytes = bech32.convertbits(data, 5, 8)[:-1]
         return cls(bytes(raw_bytes))
 
+    @classmethod
+    def from_hex(cls, hex: str) -> 'PublicKey':
+        return cls(bytes.fromhex(hex))
+
     def bech32(self) -> str:
         converted_bits = bech32.convertbits(self.raw_bytes, 8, 5)
         return bech32.bech32_encode("npub", converted_bits, bech32.Encoding.BECH32)
@@ -44,6 +48,10 @@ class PrivateKey:
         hrp, data, spec = bech32.bech32_decode(nsec)
         raw_secret = bech32.convertbits(data, 5, 8)[:-1]
         return cls(bytes(raw_secret))
+
+    @classmethod
+    def from_hex(cls, hex: str) -> 'PrivateKey':
+        return cls(bytes.fromhex(hex))
 
     def bech32(self) -> str:
         converted_bits = bech32.convertbits(self.raw_secret, 8, 5)
