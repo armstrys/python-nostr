@@ -10,6 +10,13 @@ class PublicKey:
     def __init__(self, raw_bytes: bytes) -> None:
         self.raw_bytes = raw_bytes
 
+    @classmethod
+    def from_npub(cls, npub: str):
+        """ Load a PublicKey from its bech32/nsec form """
+        hrp, data, spec = bech32.bech32_decode(npub)
+        raw_bytes = bech32.convertbits(data, 5, 8)[:-1]
+        return cls(bytes(raw_bytes))
+
     def bech32(self) -> str:
         converted_bits = bech32.convertbits(self.raw_bytes, 8, 5)
         return bech32.bech32_encode("npub", converted_bits, bech32.Encoding.BECH32)
